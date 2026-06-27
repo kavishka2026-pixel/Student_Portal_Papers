@@ -1,258 +1,548 @@
-:root {
-    --bg-color: #0f172a;
-    --card-bg: #1e293b;
-    --accent-blue: #38bdf8;
-    --accent-green: #10b981;
-    --text-main: #f8fafc;
-    --text-muted: #94a3b8;
-    --border-color: #334155;
+const API_URL = "https://script.google.com/macros/s/AKfycbyq06hiIei6skxBTZUIKG3-eQB1dPqCw0kWJve-CLhP3D71JKtT4Ir0shY0yDPvgGyu/exec"; 
+
+let siteData = { papers: [], notices: [] }; 
+let currentUser = "";
+let currentUserPassword = ""; 
+let currentUserRole = "user"; 
+let currentUserBookmarks = []; 
+let isLoginMode = true;
+
+const appContent = document.getElementById('appContent');
+const searchWrapper = document.getElementById('searchWrapper');
+const searchBar = document.getElementById('searchBar');
+const noticeBoard = document.getElementById('noticeBoard');
+
+// 1. FETCH DATA FROM DATABASE
+async function fetchPapersFromDatabase() {
+    searchWrapper.style.display = 'none'; 
+    noticeBoard.style.display = 'none';
+    
+    appContent.innerHTML = `
+        <div style="text-align: center; margin-top: 80px; color: var(--accent-blue);">
+            <i class="fa-solid fa-spinner fa-spin fa-3x"></i>
+            <h2 style="margin-top: 20px;">Loading Database...</h2>
+            <p style="color: var(--text-muted);">Please wait a moment while we fetch the data.</p>
+        </div>
+    `;
+    
+    try {
+        let response = await fetch(API_URL);
+        let result = await response.json();
+        
+        siteData.papers = result.papers || [];
+        siteData.notices = result.notices || [];
+
+        renderNoticeBoard();
+        searchBar.value = ""; 
+        renderHome(); 
+
+    } catch (error) {
+        appContent.innerHTML = `
+            <div style="text-align: center; margin-top: 80px; color: #f87171;">
+                <i class="fa-solid fa-triangle-exclamation fa-3x"></i>
+                <h2 style="margin-top: 20px;">Connection Error!</h2>
+                <p>Could not connect to the database.</p>
+                <button class="back-btn" style="margin-top:20px; float:none;" onclick="fetchPapersFromDatabase()">
+                    <i class="fa-solid fa-rotate-right"></i> Try Again
+                </button>
+            </div>
+        `;
+    }
 }
 
-body {
-    font-family: 'Inter', sans-serif;
-    background-color: var(--bg-color);
-    margin: 0;
-    padding: 20px;
-    color: var(--text-main);
-    min-height: 100vh;
+// 2. RENDER NOTICES
+function renderNoticeBoard() {
+    if (siteData.notices.length === 0) {
+        noticeBoard.style.display = 'none';
+        return;
+    }
+    let html = `
+        <div class="notice-title"><i class="fa-solid fa-bullhorn"></i> Important Announcements</div>
+        <ul style="margin: 0; padding-left: 20px;">
+    `;
+    siteData.notices.forEach(notice => {
+        html += `<li class="notice-item">${notice}</li>`;
+    });
+    html += `</ul>`;
+    noticeBoard.innerHTML = html;
+    noticeBoard.style.display = 'block';
 }
 
-header {
-    text-align: center;
-    margin-bottom: 40px;
-    position: relative;
+// 3. RENDER HOME (FACULTIES)
+function renderHome() {
+    searchWrapper.style.display = 'flex';
+    renderNoticeBoard();
+    
+    let html = `
+        <div class="welcome-section" style="width: 100%; text-align: center; margin-bottom: 10px;">
+            <h2 style="color: var(--accent-blue); font-size: 1.8em;"><i class="fa-solid fa-building-columns"></i> Select Your Faculty</h2>
+        </div>
+        <div class="grid-container">`;
+    
+    let faculties = [...new Set(siteData.papers.map(p => p.faculty ? p.faculty.toString().trim() : ""))].filter(Boolean);
+
+    if (faculties.length === 0) {
+        html = '<h3 style="text-align:center; width:100%; color:var(--text-muted); margin-top:50px;">No faculties found.</h3>';
+    } else {
+        faculties.forEach(faculty => {
+            html += `
+                <div class="tile" onclick="renderLevels('${faculty.replace(/'/g, "\\'")}')">
+                    <i class="fa-solid fa-folder-open"></i>
+                    <h3>${faculty}</h3>
+                </div>
+            `;
+        });
+    }
+    html += '</div>';
+    appContent.innerHTML = html;
 }
 
-.nav-controls {
-    display: flex;
-    justify-content: flex-end;
-    gap: 10px;
-    align-items: center;
-    margin-bottom: 30px;
-    flex-wrap: wrap;
-    width: 100%;
+// 4. RENDER LEVELS
+function renderLevels(faculty) {
+    searchWrapper.style.display = 'none';
+    noticeBoard.style.display = 'none';
+    
+    let filteredPapers = siteData.papers.filter(p => p.faculty && p.faculty.toString().trim() === faculty.toString().trim());
+    let levels = [...new Set(filteredPapers.map(p => p.level ? p.level.toString().trim() : ""))].filter(Boolean);
+
+    let html = `
+        <div style="max-width: 1100px; margin: 0 auto 20px auto;">
+            <div class="back-btn" onclick="renderHome()"><i class="fa-solid fa-arrow-left"></i> Back to Faculties</div>
+        </div>
+        <div class="welcome-section" style="width: 100%; text-align: center; margin-bottom: 10px;">
+            <h2 style="color: var(--accent-blue); font-size: 1.8em;">${faculty}</h2>
+        </div>
+        <div class="grid-container">`;
+    
+    levels.forEach(level => {
+        html += `
+            <div class="tile" onclick="renderSubjects('${faculty.replace(/'/g, "\\'")}', '${level.replace(/'/g, "\\'")}')">
+                <i class="fa-solid fa-layer-group"></i>
+                <h3>${level}</h3>
+            </div>
+        `;
+    });
+    html += '</div>';
+    appContent.innerHTML = html;
 }
 
-header h1 {
-    font-size: 2.8em;
-    font-weight: 700;
-    background: linear-gradient(to right, #38bdf8, #818cf8);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    margin-bottom: 10px;
+// 5. RENDER SUBJECTS (COURSE CODES)
+function renderSubjects(faculty, level) {
+    searchWrapper.style.display = 'none';
+    noticeBoard.style.display = 'none';
+    
+    let filteredPapers = siteData.papers.filter(p => 
+        p.faculty && p.faculty.toString().trim() === faculty.toString().trim() && 
+        p.level && p.level.toString().trim() === level.toString().trim()
+    );
+
+    let uniqueCodes = [...new Set(filteredPapers.map(p => p.code ? p.code.toString().trim() : ""))].filter(Boolean);
+
+    let html = `
+        <div style="max-width: 1100px; margin: 0 auto 20px auto;">
+            <div class="back-btn" onclick="renderLevels('${faculty.replace(/'/g, "\\'")}')"><i class="fa-solid fa-arrow-left"></i> Back to Levels</div>
+        </div>
+        <div class="welcome-section" style="width: 100%; text-align: center; margin-bottom: 10px;">
+            <h2 style="color: var(--accent-blue); font-size: 1.8em;">${level} - Select Subject Code</h2>
+        </div>
+        <div class="grid-container">`;
+    
+    uniqueCodes.forEach(code => {
+        html += `
+            <div class="tile" onclick="renderPapersList('${faculty.replace(/'/g, "\\'")}', '${level.replace(/'/g, "\\'")}', '${code.replace(/'/g, "\\'")}')">
+                <i class="fa-solid fa-book"></i>
+                <h3>${code}</h3>
+            </div>
+        `;
+    });
+    html += '</div>';
+    appContent.innerHTML = html;
 }
 
-header p { color: var(--text-muted); font-size: 1.1em; }
+// 5.1 RENDER PAPERS LIST
+function renderPapersList(faculty, level, code) {
+    searchWrapper.style.display = 'none';
+    noticeBoard.style.display = 'none';
 
-.search-container {
-    margin-top: 30px; display: flex; justify-content: center;
+    let filteredPapers = siteData.papers.filter(p => 
+        p.faculty && p.faculty.toString().trim() === faculty.toString().trim() && 
+        p.level && p.level.toString().trim() === level.toString().trim() &&
+        p.code && p.code.toString().trim() === code.toString().trim()
+    );
+
+    let html = `
+        <div style="max-width: 1100px; margin: 0 auto 20px auto;">
+            <div class="back-btn" onclick="renderSubjects('${faculty.replace(/'/g, "\\'")}', '${level.replace(/'/g, "\\'")}')"><i class="fa-solid fa-arrow-left"></i> Back to Course Codes</div>
+        </div>
+        <div class="welcome-section" style="width: 100%; text-align: center; margin-bottom: 10px;">
+            <h2 style="color: var(--accent-blue); font-size: 1.8em;">Papers for ${code}</h2>
+        </div>
+        <div class="grid-container">`;
+
+    filteredPapers.forEach(subject => {
+        let isBookmarked = currentUserBookmarks.includes(subject.code.toString().trim());
+        let bookmarkClass = isBookmarked ? "active" : "";
+        let starIcon = isBookmarked ? "fa-solid fa-star" : "fa-regular fa-star";
+
+        html += `
+            <div class="tile" style="position:relative;">
+                <button class="bookmark-icon-btn ${bookmarkClass}" onclick="toggleBookmark('${subject.code.replace(/'/g, "\\'")}', event)">
+                    <i class="${starIcon}"></i>
+                </button>
+                <div onclick="renderPaperView('${faculty.replace(/'/g, "\\'")}', '${level.replace(/'/g, "\\'")}', '${subject.code.replace(/'/g, "\\'")}', '${subject.name.replace(/'/g, "\\'")}')">
+                    <i class="fa-regular fa-file-pdf"></i>
+                    <h3>${subject.name}</h3>
+                    <div class="stats-badge" style="margin-top:10px;"><i class="fa-solid fa-download"></i> ${subject.downloads} Downloads</div>
+                </div>
+            </div>
+        `;
+    });
+    html += '</div>';
+    appContent.innerHTML = html;
 }
-#searchBar {
-    width: 100%; max-width: 600px; padding: 15px 25px; border-radius: 50px;
-    border: 2px solid var(--border-color); background: var(--card-bg);
-    color: white; font-size: 16px; outline: none; transition: all 0.3s;
-}
-#searchBar:focus { border-color: var(--accent-blue); box-shadow: 0 0 15px rgba(56, 189, 248, 0.2); }
 
-/* GRID CONTAINER */
-.grid-container { 
-    display: grid; 
-    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); 
-    gap: 20px; 
-    max-width: 1100px; 
-    margin: 0 auto; 
-    padding: 20px 0; 
-}
+// 6. RENDER PAPER VIEW
+function renderPaperView(faculty, level, code, name) {
+    searchWrapper.style.display = 'none';
+    noticeBoard.style.display = 'none';
+    
+    let subject = siteData.papers.find(p => p.code.toString().trim() === code.toString().trim() && p.name.toString().trim() === name.toString().trim());
+    if(!subject) return;
 
-/* TILES STYLE */
-.tile { 
-    background: var(--card-bg); 
-    padding: 25px 20px; 
-    border-radius: 16px; 
-    text-align: center; 
-    border: 1px solid var(--border-color); 
-    cursor: pointer; 
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
-    position: relative; 
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-}
-.tile:hover { transform: translateY(-5px); border-color: var(--accent-blue); box-shadow: 0 10px 20px rgba(0,0,0,0.2); }
-.tile i { font-size: 2.3em; color: var(--accent-blue); margin-bottom: 12px; }
-.tile h3 { margin: 8px 0 5px 0; font-size: 1.2em; font-weight: 600; line-height: 1.3; }
-.tile p { color: var(--text-muted); margin: 0 0 10px 0; font-size: 0.95em; line-height: 1.4; }
+    let isBookmarked = currentUserBookmarks.includes(subject.code.toString().trim());
+    let bookmarkText = isBookmarked ? "Remove Bookmark" : "Save Bookmark";
+    let starIcon = isBookmarked ? "fa-solid fa-star" : "fa-regular fa-star";
 
-.back-btn { display: inline-flex; align-items: center; gap: 8px; color: var(--accent-blue); cursor: pointer; font-weight: 600; font-size: 15px; padding: 10px 20px; border-radius: 8px; background: var(--card-bg); border: 1px solid var(--border-color); transition: all 0.3s; }
-.back-btn:hover { background: var(--border-color); }
-
-.paper-view { max-width: 1000px; margin: 0 auto; text-align: center; background: var(--card-bg); padding: 30px; border-radius: 24px; border: 1px solid var(--border-color); }
-iframe { width: 100%; height: 75vh; border: 1px solid var(--border-color); border-radius: 16px; background: white; margin-bottom: 25px; }
-
-.download-btn { padding: 14px 35px; background: linear-gradient(135deg, var(--accent-green) 0%, #059669 100%); color: white; border: none; border-radius: 50px; cursor: pointer; font-size: 15px; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 10px; transition: all 0.3s; }
-.download-btn:hover { transform: scale(1.05); }
-
-.secret-admin-trigger, .portal-nav-btn { background: var(--card-bg); border: 1px solid var(--border-color); color: var(--text-main); cursor: pointer; font-size: 0.95em; padding: 10px 16px; border-radius: 10px; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; transition: all 0.3s; }
-.secret-admin-trigger:hover, .portal-nav-btn:hover { border-color: var(--accent-blue); color: var(--accent-blue); }
-.logout-btn:hover { border-color: #f87171 !important; color: #f87171 !important; }
-
-.admin-panel { max-width: 600px; margin: 0 auto; background: var(--card-bg); padding: 30px; border-radius: 20px; border: 1px solid var(--border-color); }
-.form-group { margin-bottom: 20px; display: flex; flex-direction: column; text-align: left; }
-.form-group label { margin-bottom: 8px; color: var(--text-muted); font-weight: 600; }
-.form-group input, .form-group select, .form-group textarea { padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-color); color: white; font-size: 15px; outline: none; box-sizing: border-box; }
-.form-group input:focus, .form-group textarea:focus { border-color: var(--accent-blue); }
-
-.auth-container { display: flex; justify-content: center; align-items: center; min-height: 90vh; }
-.auth-box { background: var(--card-bg); border: 1px solid var(--border-color); padding: 40px; border-radius: 24px; width: 100%; max-width: 420px; box-shadow: 0 20px 40px rgba(0,0,0,0.4); text-align: center; box-sizing: border-box; }
-.auth-box h2 { margin-bottom: 25px; color: var(--accent-blue); font-size: 1.8em; }
-
-/* WHATSAPP FLOATING BUTTON */
-.whatsapp-floating-btn { position: fixed; bottom: 20px; right: 20px; background: #25d366; color: white; padding: 12px 20px; border-radius: 50px; text-decoration: none; font-weight: 700; display: flex; align-items: center; gap: 8px; box-shadow: 0 8px 24px rgba(37, 211, 102, 0.3); z-index: 9999; transition: all 0.3s; font-size: 14px; }
-.whatsapp-floating-btn i { font-size: 1.4em; }
-.whatsapp-floating-btn:hover { transform: scale(1.05); }
-
-.notice-board-container { max-width: 800px; margin: 20px auto 0 auto; background: linear-gradient(135deg, rgba(56, 189, 248, 0.1) 0%, rgba(129, 140, 248, 0.1) 100%); border: 1px dashed var(--accent-blue); padding: 15px 25px; border-radius: 16px; text-align: left; }
-.notice-title { font-weight: 700; color: var(--accent-blue); margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
-.notice-item { font-size: 0.95em; color: #e2e8f0; margin-bottom: 5px; line-height: 1.5; }
-
-/* BOOKMARK BUTTON */
-.bookmark-icon-btn { position: absolute; top: 12px; right: 12px; background: transparent; border: none; color: #64748b; font-size: 1.3em; cursor: pointer; transition: all 0.2s; z-index: 10; outline: none; padding: 5px; }
-.bookmark-icon-btn.active { color: #f59e0b; }
-.bookmark-icon-btn:hover { transform: scale(1.2); }
-
-.stats-badge { display: inline-flex; align-items: center; gap: 5px; background: rgba(16, 185, 129, 0.15); color: var(--accent-green); padding: 5px 12px; border-radius: 12px; font-size: 0.8em; font-weight: 600; margin-top: 5px; }
-
-/* =========================================
-   📱 ULTRA-MODERN MOBILE UI UPDATE
-   ========================================= */
-@media screen and (max-width: 768px) {
-    body {
-        padding: 12px 10px;
+    let embedLink = subject.pdf;
+    if (embedLink && embedLink.includes('/view')) {
+        embedLink = embedLink.replace(/\/view.*$/, "/preview");
     }
 
-    header {
-        margin-bottom: 20px;
-    }
+    let html = `
+        <div style="max-width: 1000px; margin: 0 auto 20px auto; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+            <div class="back-btn" onclick="renderPapersList('${faculty.replace(/'/g, "\\'")}', '${level.replace(/'/g, "\\'")}', '${code.replace(/'/g, "\\'")}')"><i class="fa-solid fa-arrow-left"></i> Back to Papers</div>
+            <button class="portal-nav-btn" onclick="toggleBookmark('${subject.code.replace(/'/g, "\\'")}', null, true, '${faculty}', '${level}', '${subject.name.replace(/'/g, "\\'")}')">
+                <i class="${starIcon}" style="color:#f59e0b;"></i> ${bookmarkText}
+            </button>
+        </div>
+        <div class="paper-view">
+            <h2>${subject.code} - ${subject.name}</h2>
+            <div class="stats-badge" style="margin-bottom:15px; font-size:1em; padding:6px 14px;"><i class="fa-solid fa-download"></i> Total Downloads: ${subject.downloads}</div>
+            <iframe src="${embedLink}"></iframe>
+            <br>
+            <a href="${subject.pdf}" target="_blank" class="download-btn" onclick="trackDownload('${subject.code.replace(/'/g, "\\'")}', '${subject.name.replace(/'/g, "\\'")}')">
+                <i class="fa-solid fa-cloud-arrow-down"></i> Download PDF
+            </a>
+        </div>
+    `;
+    appContent.innerHTML = html;
+}
 
-    header h1 {
-        font-size: 1.6em;
-        line-height: 1.2;
-        margin-top: 5px;
-        letter-spacing: -0.5px;
+// TRACK DOWNLOAD
+function trackDownload(code, name) {
+    fetch(API_URL + "?action=download&code=" + encodeURIComponent(code) + "&name=" + encodeURIComponent(name));
+    let paper = siteData.papers.find(p => p.code.toString().trim() === code.toString().trim() && p.name.toString().trim() === name.toString().trim());
+    if (paper) paper.downloads = (parseInt(paper.downloads) || 0) + 1;
+}
+
+// TOGGLE BOOKMARK
+async function toggleBookmark(code, event, refreshView = false, faculty = '', level = '', name = '') {
+    if(event) event.stopPropagation(); 
+    
+    const payload = { action: "toggleBookmark", username: currentUser, code: code };
+    
+    if (currentUserBookmarks.includes(code)) {
+        currentUserBookmarks = currentUserBookmarks.filter(c => c !== code);
+    } else {
+        currentUserBookmarks.push(code);
     }
     
-    header p {
-        font-size: 0.85em;
-        margin-bottom: 12px;
+    if (refreshView) {
+        renderPaperView(faculty, level, code, name);
+    } else if (searchWrapper.style.display === 'flex' && searchBar.value !== "") {
+        searchPaper();
+    } else {
+        let p = siteData.papers.find(paper => paper.code.toString().trim() === code.toString().trim());
+        if(p) renderPapersList(p.faculty, p.level, p.code);
     }
 
-    .nav-controls {
-        justify-content: space-between;
-        margin-bottom: 15px;
-        gap: 6px;
-    }
+    try {
+        await fetch(API_URL, {
+            method: 'POST',
+            headers: { "Content-Type": "text/plain;charset=utf-8" },
+            body: JSON.stringify(payload)
+        });
+    } catch (e) { console.log("Bookmark saved in background."); }
+}
 
-    .nav-controls .portal-nav-btn, 
-    .nav-controls .secret-admin-trigger {
-        flex: 1;
-        justify-content: center;
-        font-size: 11px !important;
-        padding: 8px 6px !important;
-        border-radius: 8px;
-    }
+// RENDER BOOKMARKS
+function renderBookmarks() {
+    searchWrapper.style.display = 'none';
+    noticeBoard.style.display = 'none';
 
-    /* 🔥 සුපිරි වෙනස: එක ළඟ ටයිල් 2ක් වැටෙන්න හදපු Grid එක */
-    .grid-container {
-        grid-template-columns: repeat(2, 1fr); 
-        gap: 10px;
-        padding: 5px 0;
-    }
+    let html = `
+        <div style="max-width: 1100px; margin: 0 auto 20px auto;">
+            <div class="back-btn" onclick="renderHome()"><i class="fa-solid fa-arrow-left"></i> Back to Home</div>
+        </div>
+        <div class="welcome-section" style="width: 100%; text-align: center; margin-bottom: 10px;">
+            <h2 style="color: #f59e0b; font-size: 1.8em;"><i class="fa-solid fa-star"></i> My Saved Papers</h2>
+        </div>
+        <div class="grid-container">`;
 
-    /* මොබයිල් එකට ගැලපෙන සිරාම Tiles ප්‍රමාණය (Compact and Premium Look) */
-    .tile {
-        padding: 16px 10px;
-        border-radius: 12px;
-        min-height: 110px; /* ටයිල්ස් වල උස සමබරව තියාගන්න */
-    }
+    let savedPapers = siteData.papers.filter(p => currentUserBookmarks.includes(p.code.toString().trim()));
 
-    .tile i {
-        font-size: 1.6em;
-        margin-bottom: 6px;
+    if (savedPapers.length === 0) {
+        html += `<h4 style="text-align:center; width:100%; color:var(--text-muted); margin-top:40px;">You haven't saved any papers yet. Click the star icon on any paper to save it here.</h4>`;
+    } else {
+        savedPapers.forEach(subject => {
+            html += `
+                <div class="tile" style="position:relative;">
+                    <button class="bookmark-icon-btn active" onclick="toggleBookmark('${subject.code.replace(/'/g, "\\'")}', event); setTimeout(renderBookmarks, 150);">
+                        <i class="fa-solid fa-star"></i>
+                    </button>
+                    <div onclick="renderPaperView('${subject.faculty.replace(/'/g, "\\'")}', '${subject.level.replace(/'/g, "\\'")}', '${subject.code.replace(/'/g, "\\'")}', '${subject.name.replace(/'/g, "\\'")}')">
+                        <i class="fa-regular fa-file-pdf"></i>
+                        <h3>${subject.code}</h3>
+                        <p>${subject.name}</p>
+                        <p style="font-size:0.8em; color:var(--accent-blue); margin-top:8px;">${subject.faculty} | ${subject.level}</p>
+                    </div>
+                </div>
+            `;
+        });
     }
+    html += '</div>';
+    appContent.innerHTML = html;
+}
 
-    .tile h3 {
-        font-size: 0.95em;
-        font-weight: 600;
-        margin: 2px 0;
-        word-break: break-word; /* දිග කේතයන් කැඩී ලස්සනට පෙනීමට */
-    }
+// SEARCH FUNCTION
+function searchPaper() {
+    let input = searchBar.value.toUpperCase();
+    if (input === "") { renderHome(); return; }
+    
+    let html = '<div class="grid-container">';
+    let found = false;
+    
+    siteData.papers.forEach(subject => {
+        if (subject.code.toUpperCase().includes(input) || subject.name.toUpperCase().includes(input)) {
+            found = true;
+            let isBookmarked = currentUserBookmarks.includes(subject.code.toString().trim());
+            let bookmarkClass = isBookmarked ? "active" : "";
+            let starIcon = isBookmarked ? "fa-solid fa-star" : "fa-regular fa-star";
 
-    .tile p {
-        font-size: 0.8em;
-        margin-bottom: 4px;
-        line-height: 1.2;
+            html += `
+                <div class="tile" style="position:relative;">
+                    <button class="bookmark-icon-btn ${bookmarkClass}" onclick="toggleBookmark('${subject.code.replace(/'/g, "\\'")}', event)">
+                        <i class="${starIcon}"></i>
+                    </button>
+                    <div onclick="renderPaperView('${subject.faculty.replace(/'/g, "\\'")}', '${subject.level.replace(/'/g, "\\'")}', '${subject.code.replace(/'/g, "\\'")}', '${subject.name.replace(/'/g, "\\'")}')">
+                        <i class="fa-regular fa-file-pdf"></i>
+                        <h3>${subject.code}</h3>
+                        <p>${subject.name}</p>
+                        <p style="font-size: 0.8em; margin-top:12px; color:var(--accent-blue);">${subject.faculty} | ${subject.level}</p>
+                    </div>
+                </div>
+            `;
+        }
+    });
+    html += '</div>';
+    
+    if (!found) {
+        html = `<div style="text-align:center; width:100%; margin-top:40px;">
+                    <i class="fa-solid fa-circle-exclamation" style="font-size:2.5em; color:#f87171; margin-bottom:15px;"></i>
+                    <p style="color:#f87171; font-size:1.2em;">No papers found</p>
+                </div>`;
     }
+    appContent.innerHTML = html;
+}
 
-    .bookmark-icon-btn {
-        top: 6px;
-        right: 6px;
-        font-size: 1.1em;
-    }
+// ADMIN PANEL
+function openAdmin() {
+    if (currentUserRole !== "admin") { alert("Access Denied!"); return; }
+    searchWrapper.style.display = 'none';
+    noticeBoard.style.display = 'none';
+    
+    appContent.innerHTML = `
+        <div class="admin-panel">
+            <h2 style="text-align:center; color: var(--accent-blue); margin-bottom: 20px;"><i class="fa-solid fa-plus"></i> Add New Past Paper</h2>
+            <form id="addPaperForm" onsubmit="submitNewPaper(event)">
+                <div class="form-group"><label>Faculty</label><input type="text" id="f_faculty" required placeholder="e.g., Engineering"></div>
+                <div class="form-group"><label>Level</label><input type="text" id="f_level" required placeholder="e.g., Level 3"></div>
+                <div class="form-group"><label>Course Code</label><input type="text" id="f_code" required placeholder="e.g., EEI3346"></div>
+                <div class="form-group"><label>Course Name</label><input type="text" id="f_name" required placeholder="e.g., Web Development"></div>
+                <div class="form-group"><label>PDF Link</label><input type="url" id="f_pdf" required placeholder="Google Drive Link"></div>
+                <button type="submit" class="download-btn" style="width:100%; justify-content:center;">Save Paper</button>
+            </form>
+            <p id="formStatus" style="text-align:center; margin-top:10px; font-weight:bold;"></p>
+            
+            <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 30px 0;">
+            
+            <h2 style="text-align:center; color: #f59e0b; margin-bottom: 20px;"><i class="fa-solid fa-bullhorn"></i> Post New Notice</h2>
+            <form id="addNoticeForm" onsubmit="submitNewNotice(event)">
+                <div class="form-group">
+                    <label>Notice Content</label>
+                    <textarea id="f_notice" required rows="3" placeholder="Type announcement for students..."></textarea>
+                </div>
+                <button type="submit" class="download-btn" style="width:100%; justify-content:center; background:linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">Publish Notice</button>
+            </form>
+            <p id="noticeFormStatus" style="text-align:center; margin-top:10px; font-weight:bold;"></p>
 
-    .stats-badge {
-        font-size: 0.7em;
-        padding: 3px 8px;
-        border-radius: 8px;
-        margin-top: 4px;
-    }
+            <button class="back-btn" style="width:100%; margin-top:30px; justify-content:center;" onclick="fetchPapersFromDatabase()">Back to Home</button>
+        </div>
+    `;
+}
 
-    iframe {
-        height: 50vh; 
-        margin-bottom: 15px;
-        border-radius: 10px;
+async function submitNewPaper(e) {
+    e.preventDefault();
+    let status = document.getElementById('formStatus');
+    status.innerText = "Saving... Please wait."; status.style.color = "var(--accent-blue)";
+    
+    let payload = {
+        action: "add",
+        admin_user: currentUser,
+        admin_pass: currentUserPassword,
+        faculty: document.getElementById('f_faculty').value,
+        level: document.getElementById('f_level').value,
+        code: document.getElementById('f_code').value,
+        name: document.getElementById('f_name').value,
+        pdf: document.getElementById('f_pdf').value
+    };
+        
+    try {
+        let response = await fetch(API_URL, {
+            method: 'POST',
+            headers: { "Content-Type": "text/plain;charset=utf-8" },
+            body: JSON.stringify(payload)
+        });
+        let result = await response.json();
+        
+        if (result.status === "success") {
+            status.innerText = result.message; status.style.color = "var(--accent-green)";
+            document.getElementById('addPaperForm').reset();
+        } else {
+            status.innerText = result.message; status.style.color = "#f87171";
+        }
+    } catch(err) {
+        status.innerText = "Connection Error! Database update failed."; status.style.color = "#f87171";
     }
+}
 
-    .paper-view {
-        padding: 15px 10px;
-        border-radius: 16px;
+async function submitNewNotice(e) {
+    e.preventDefault();
+    let status = document.getElementById('noticeFormStatus');
+    status.innerText = "Publishing... Please wait."; status.style.color = "var(--accent-blue)";
+    
+    let payload = {
+        action: "addNotice",
+        admin_user: currentUser,
+        admin_pass: currentUserPassword,
+        text: document.getElementById('f_notice').value
+    };
+        
+    try {
+        let response = await fetch(API_URL, {
+            method: 'POST',
+            headers: { "Content-Type": "text/plain;charset=utf-8" },
+            body: JSON.stringify(payload)
+        });
+        let result = await response.json();
+        
+        if (result.status === "success") {
+            status.innerText = result.message; status.style.color = "var(--accent-green)";
+            document.getElementById('addNoticeForm').reset();
+        } else {
+            status.innerText = result.message; status.style.color = "#f87171";
+        }
+    } catch(err) {
+        status.innerText = "Connection Error! Notice publication failed."; status.style.color = "#f87171";
     }
+}
 
-    .paper-view h2 {
-        font-size: 1.1em;
-        line-height: 1.4;
-    }
+// AUTH SYSTEM
+function toggleAuthMode() {
+    isLoginMode = !isLoginMode;
+    document.getElementById('authTitle').innerText = isLoginMode ? "Portal Login" : "Portal Register";
+    document.getElementById('authBtn').innerText = isLoginMode ? "Login" : "Register";
+    document.getElementById('toggleAuthText').innerText = isLoginMode ? "Don't have an account?" : "Already have an account?";
+    document.getElementById('toggleAuthLink').innerText = isLoginMode ? " Register here" : " Login here";
+    document.getElementById('contactGroup').style.display = isLoginMode ? "none" : "flex";
+    document.getElementById('auth_contact').required = !isLoginMode;
+    document.getElementById('authStatus').innerText = "";
+    document.getElementById('authForm').reset();
+}
 
-    .auth-box, .admin-panel {
-        padding: 20px 15px;
-        margin: 10px 0;
-        width: 100%;
-        border-radius: 16px;
-    }
+function handleForgotPassword() {
+    let enteredUser = document.getElementById('auth_user').value.trim();
+    let whatsappNumber = "94784293548"; 
+    let message = "Hi Admin, I forgot my password for OUSL Past Paper Portal.";
+    if (enteredUser) { message += " My username is: " + enteredUser; }
+    window.open(`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`, '_blank');
+}
 
-    .download-btn, .back-btn {
-        width: 100%;
-        justify-content: center;
-        box-sizing: border-box;
-        padding: 12px;
-        font-size: 13px;
-        border-radius: 30px;
-    }
+async function handleAuth(e) {
+    e.preventDefault();
+    const username = document.getElementById('auth_user').value;
+    const password = document.getElementById('auth_pass').value;
+    const contact = document.getElementById('auth_contact').value;
+    const statusText = document.getElementById('authStatus');
+    
+    statusText.innerText = isLoginMode ? "Logging in..." : "Registering...";
+    statusText.style.color = "var(--accent-blue)";
 
-    .search-container {
-        margin-top: 10px;
-    }
+    const payload = { 
+        action: isLoginMode ? "login" : "register", 
+        username: username, 
+        password: password,
+        contact: isLoginMode ? "" : contact
+    };
 
-    #searchBar {
-        font-size: 13px;
-        padding: 10px 18px;
-    }
+    try {
+        let response = await fetch(API_URL, {
+            method: 'POST',
+            headers: { "Content-Type": "text/plain;charset=utf-8" },
+            body: JSON.stringify(payload)
+        });
+        let result = await response.json();
 
-    .whatsapp-floating-btn {
-        bottom: 12px;
-        right: 12px;
-        padding: 8px 14px;
-        font-size: 12px;
-        border-radius: 30px;
-    }
+        if (result.status === "success") {
+            statusText.style.color = "var(--accent-green)";
+            statusText.innerText = result.message;
+            
+            if (isLoginMode) {
+                currentUser = username;
+                currentUserPassword = password; 
+                currentUserRole = result.role; 
+                currentUserBookmarks = result.bookmarks || [];
+                
+                setTimeout(() => {
+                    document.getElementById('authContainer').style.display = 'none';
+                    document.getElementById('mainPortal').style.display = 'block';
+                    
+                    // LOGIN වුණාම FLOATING BUTTON එක පෙන්වනවා
+                    const helpBtn = document.getElementById('whatsappHelpBtn');
+                    if (helpBtn) helpBtn.style.display = 'flex'; 
+                    
+                    document.getElementById('adminLockBtn').style.display = currentUserRole === "admin" ? "inline-flex" : "none";
+                    fetchPapersFromDatabase(); 
+                }, 1000);
+            } else {
+                setTimeout(() => toggleAuthMode(), 1500);
+            }
+        } else {
+            statusText.style.color = "#f87171"; statusText.innerText = result.message;
+        }
+    } catch (error) { statusText.style.color = "#f87171"; statusText.innerText = "Error Connecting to Server."; }
+}
+
+function handleLogout() {
+    currentUser = ""; currentUserPassword = ""; currentUserRole = "user"; currentUserBookmarks = [];
+    document.getElementById('mainPortal').style.display = 'none';
+    document.getElementById('authContainer').style.display = 'flex';
+    
+    // LOGOUT වුණාම FLOATING BUTTON එක හංගනවා
+    const helpBtn = document.getElementById('whatsappHelpBtn');
+    if (helpBtn) helpBtn.style.display = 'none'; 
+    
+    if(!isLoginMode) toggleAuthMode();
+    document.getElementById('authForm').reset();
+    document.getElementById('authStatus').innerText = "";
 }
