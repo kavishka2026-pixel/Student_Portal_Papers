@@ -124,11 +124,11 @@ iframe { width: 100%; height: 75vh; border: 1px solid var(--border-color); borde
 .stats-badge { display: inline-flex; align-items: center; gap: 5px; background: rgba(16, 185, 129, 0.15); color: var(--accent-green); padding: 5px 12px; border-radius: 12px; font-size: 0.8em; font-weight: 600; margin-top: 5px; }
 
 /* =========================================
-   📱 ULTRA-MODERN MOBILE UI UPDATE
+   📱 ULTRA-MODERN MOBILE UI UPDATE (FIXED PADDING)
    ========================================= */
 @media screen and (max-width: 768px) {
     body {
-        padding: 12px 10px;
+        padding: 12px 20px; /* 🌟 Screen එකේ දෙපැත්තෙන් හිස් ඉඩ (Padding) වැඩි කළා */
     }
 
     header {
@@ -150,7 +150,6 @@ iframe { width: 100%; height: 75vh; border: 1px solid var(--border-color); borde
         margin-bottom: 12px;
     }
 
-    /* 🌟 UPDATE: Mobile එකේදී බටන්ස් තෙරපෙන්නේ නැති වෙන්න Flex layout එක හැදුවා */
     .nav-controls {
         display: flex;
         justify-content: center;
@@ -160,7 +159,6 @@ iframe { width: 100%; height: 75vh; border: 1px solid var(--border-color); borde
         margin: 5px auto 15px auto;
     }
 
-    /* 🌟 UPDATE: Bookmarks බටන් එකට වැඩි ඉඩක් දුන්නා */
     .nav-controls .portal-nav-btn {
         flex: 2;
         justify-content: center;
@@ -169,7 +167,6 @@ iframe { width: 100%; height: 75vh; border: 1px solid var(--border-color); borde
         border-radius: 10px;
     }
 
-    /* 🌟 UPDATE: Logout එක පිළිවෙලට Icon එකක් විතරක් වෙන්න සකස් කළා */
     .nav-controls .logout-btn {
         flex: 0 0 auto;
         width: 42px;
@@ -186,30 +183,31 @@ iframe { width: 100%; height: 75vh; border: 1px solid var(--border-color); borde
 
     .grid-container {
         grid-template-columns: repeat(2, 1fr); 
-        gap: 10px;
-        padding: 5px 0;
+        gap: 12px;
+        padding: 5px 4px;
     }
 
+    /* 🌟 Tiles ටික තවත් Compact කරලා දෙපැත්ත මැදට ගත්තා */
     .tile {
-        padding: 16px 10px;
+        padding: 14px 8px;
         border-radius: 12px;
-        min-height: 110px; 
+        min-height: 100px; 
     }
 
     .tile i {
-        font-size: 1.6em;
-        margin-bottom: 6px;
+        font-size: 1.4em;
+        margin-bottom: 4px;
     }
 
     .tile h3 {
-        font-size: 0.95em;
+        font-size: 0.88em;
         font-weight: 600;
         margin: 2px 0;
         word-break: break-word; 
     }
 
     .tile p {
-        font-size: 0.8em;
+        font-size: 0.75em;
         margin-bottom: 4px;
         line-height: 1.2;
     }
@@ -221,8 +219,8 @@ iframe { width: 100%; height: 75vh; border: 1px solid var(--border-color); borde
     }
 
     .stats-badge {
-        font-size: 0.7em;
-        padding: 3px 8px;
+        font-size: 0.68em;
+        padding: 3px 6px;
         border-radius: 8px;
         margin-top: 4px;
     }
